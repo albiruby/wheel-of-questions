@@ -1053,7 +1053,7 @@ export default function App() {
           {/* Wheel Interactive Container */}
           <div
             ref={containerRef}
-            className="relative w-full max-w-[490px] aspect-square flex items-center justify-center select-none"
+            className="relative w-full max-w-[min(490px,max(220px,calc(100svh-140px)))] aspect-square flex items-center justify-center select-none"
           >
             {/* Fixed Top Pointer at 12 o'clock */}
             <div
@@ -1123,7 +1123,7 @@ export default function App() {
           </div>
 
           {/* Winner Banner / Live Result Card */}
-          <div className="w-full max-w-[490px] mt-4 min-h-[92px]">
+          <div className="w-full max-w-[min(490px,max(220px,calc(100svh-140px)))] mt-4 min-h-[92px]">
             {winner ? (
               <div
                 role="status"
