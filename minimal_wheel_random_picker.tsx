@@ -122,12 +122,8 @@ function cryptoShuffle<T>(items: T[]): T[] {
 // 4. WEB AUDIO MECHANICAL TICK SYNTHESIZER
 // ==========================================
 
-const ATTACK_SOUND_URL = 'aoe2-attack.mp3';
-
 class SoundEngine {
   private ctx: AudioContext | null = null;
-  private attackBuffer: AudioBuffer | null = null;
-  private attackLoadPromise: Promise<void> | null = null;
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -165,60 +161,6 @@ class SoundEngine {
 
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.024);
-    } catch {
-      // Ignore audio errors if blocked by browser autoplay policy
-    }
-  }
-
-  /**
-   * Lazily loads and decodes aoe2-attack.mp3 once, then caches the AudioBuffer.
-   * Returns null if the file can't be fetched or decoded.
-   */
-  private loadAttackBuffer(): Promise<AudioBuffer | null> {
-    if (this.attackBuffer) return Promise.resolve(this.attackBuffer);
-    if (!this.attackLoadPromise) {
-      this.attackLoadPromise = (async () => {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        try {
-          const res = await fetch(ATTACK_SOUND_URL);
-          if (!res.ok) return;
-          const data = await res.arrayBuffer();
-          const buffer = await ctx.decodeAudioData(data);
-          this.attackBuffer = buffer;
-        } catch {
-          // Missing file or decode failure: stay silent, never break the spin
-        } finally {
-          this.attackLoadPromise = null;
-        }
-      })();
-    }
-    return this.attackLoadPromise.then(() => this.attackBuffer);
-  }
-
-  /** Preload the attack sound so it's ready by the time the wheel stops. */
-  public preloadAttackSound() {
-    void this.loadAttackBuffer();
-  }
-
-  public playAttackSound() {
-    try {
-      const ctx = this.getContext();
-      if (!ctx) return;
-      void this.loadAttackBuffer().then((buffer) => {
-        if (!buffer) return;
-        try {
-          const source = ctx.createBufferSource();
-          source.buffer = buffer;
-          const gain = ctx.createGain();
-          gain.gain.value = 0.85;
-          source.connect(gain);
-          gain.connect(ctx.destination);
-          source.start();
-        } catch {
-          // Ignore playback errors
-        }
-      });
     } catch {
       // Ignore audio errors if blocked by browser autoplay policy
     }
@@ -471,12 +413,6 @@ export default function App() {
       root.classList.remove('dark');
     }
   }, [theme]);
-
-  // Preload the wheel-stop sound so it plays without a network hitch
-  useEffect(() => {
-    if (!soundEnabled) return;
-    soundEngine.preloadAttackSound();
-  }, [soundEnabled]);
 
   // --- Canvas High-DPI Wheel Renderer ---
   const drawWheel = useCallback(() => {
@@ -807,7 +743,6 @@ export default function App() {
 
         if (soundEnabled) {
           soundEngine.playWinChime();
-          soundEngine.playAttackSound();
         }
         drawWheel();
       }
