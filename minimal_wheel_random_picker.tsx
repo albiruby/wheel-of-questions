@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import confetti from 'canvas-confetti';
 import {
   Shuffle,
   Trash2,
@@ -14,12 +15,26 @@ import {
   Info,
   X,
   RotateCw,
-  Check,
   Sparkles,
   Scale,
   List,
   AlignLeft,
-  UserMinus
+  UserMinus,
+  Maximize2,
+  Minimize2,
+  Trophy,
+  History,
+  Settings,
+  Flame,
+  Crown,
+  Dices,
+  Utensils,
+  Check,
+  Copy,
+  PieChart,
+  Volume1,
+  Music,
+  Share2
 } from 'lucide-react';
 
 // ==========================================
@@ -33,70 +48,186 @@ export interface WheelEntry {
 }
 
 export type WeightMode = 'equal' | 'weighted';
-export type EditorTab = 'bulk' | 'list';
+export type EditorTab = 'text' | 'items' | 'history' | 'stats';
 export type ThemeMode = 'light' | 'dark';
+export type PointerStyle = 'classic' | 'crown' | 'flame' | 'diamond';
+export type WheelSoundProfile = 'classic' | 'arcade' | 'casino' | 'wooden';
+
+export interface Palette {
+  id: string;
+  name: string;
+  colors: Array<{ bg: string; text: string }>;
+}
 
 export interface WinnerRecord {
+  id: string;
   entry: WheelEntry;
   index: number;
   timestamp: number;
+  roundNumber?: number;
 }
 
 export interface WheelConfigExport {
   version: number;
   weightMode: WeightMode;
+  paletteId: string;
   entries: Array<{ label: string; weight: number }>;
+  history: WinnerRecord[];
 }
 
-const STORAGE_KEY = 'minimal_wheel_state_v1';
+const STORAGE_KEY = 'gacor_wheel_state_v2';
 
 // ==========================================
-// 2. COLOR PALETTE & DESIGN TOKENS
+// 2. CURATED COLOR PALETTES
 // ==========================================
 
-// Carefully curated modern, high-contrast segment palette with explicit accessible text contrast
-const WHEEL_PALETTE = [
-  { bg: '#6366F1', text: '#FFFFFF' }, // Indigo
-  { bg: '#0EA5E9', text: '#FFFFFF' }, // Sky
-  { bg: '#10B981', text: '#FFFFFF' }, // Emerald
-  { bg: '#F59E0B', text: '#18181B' }, // Amber
-  { bg: '#F43F5E', text: '#FFFFFF' }, // Rose
-  { bg: '#8B5CF6', text: '#FFFFFF' }, // Violet
-  { bg: '#14B8A6', text: '#FFFFFF' }, // Teal
-  { bg: '#EC4899', text: '#FFFFFF' }, // Pink
-  { bg: '#3B82F6', text: '#FFFFFF' }, // Blue
-  { bg: '#84CC16', text: '#18181B' }, // Lime
+export const WHEEL_PALETTES: Palette[] = [
+  {
+    id: 'vibrant',
+    name: 'Vibrant Neon',
+    colors: [
+      { bg: '#6366F1', text: '#FFFFFF' }, // Indigo
+      { bg: '#0EA5E9', text: '#FFFFFF' }, // Sky
+      { bg: '#10B981', text: '#FFFFFF' }, // Emerald
+      { bg: '#F59E0B', text: '#18181B' }, // Amber
+      { bg: '#F43F5E', text: '#FFFFFF' }, // Rose
+      { bg: '#8B5CF6', text: '#FFFFFF' }, // Violet
+      { bg: '#14B8A6', text: '#FFFFFF' }, // Teal
+      { bg: '#EC4899', text: '#FFFFFF' }, // Pink
+      { bg: '#3B82F6', text: '#FFFFFF' }, // Blue
+      { bg: '#84CC16', text: '#18181B' }, // Lime
+    ],
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Cyberpunk 2077',
+    colors: [
+      { bg: '#FFE600', text: '#000000' }, // Cyber Yellow
+      { bg: '#00F0FF', text: '#000000' }, // Electric Cyan
+      { bg: '#FF0055', text: '#FFFFFF' }, // Neon Pink
+      { bg: '#7000FF', text: '#FFFFFF' }, // Deep Purple
+      { bg: '#00FF66', text: '#000000' }, // Neon Green
+      { bg: '#FF5500', text: '#FFFFFF' }, // Bright Orange
+    ],
+  },
+  {
+    id: 'casino_gold',
+    name: 'Casino Royal',
+    colors: [
+      { bg: '#D4AF37', text: '#18181B' }, // Metallic Gold
+      { bg: '#990000', text: '#FFFFFF' }, // Royal Crimson
+      { bg: '#0A2342', text: '#FFFFFF' }, // Deep Navy
+      { bg: '#1E5631', text: '#FFFFFF' }, // Velvet Emerald
+      { bg: '#301934', text: '#FFFFFF' }, // Royal Purple
+      { bg: '#C0C0C0', text: '#18181B' }, // Platinum
+    ],
+  },
+  {
+    id: 'kuliner_indo',
+    name: 'Makan Mana?',
+    colors: [
+      { bg: '#DC2626', text: '#FFFFFF' }, // Red Sambal
+      { bg: '#EA580C', text: '#FFFFFF' }, // Orange Rendang
+      { bg: '#CA8A04', text: '#FFFFFF' }, // Kunyit Gold
+      { bg: '#16A34A', text: '#FFFFFF' }, // Daun Mint
+      { bg: '#0284C7', text: '#FFFFFF' }, // Es Cendol Blue
+      { bg: '#7C3AED', text: '#FFFFFF' }, // Taro Violet
+    ],
+  },
+  {
+    id: 'pastel_candy',
+    name: 'Pastel Dream',
+    colors: [
+      { bg: '#FFB3BA', text: '#333333' }, // Soft Pink
+      { bg: '#FFDFBA', text: '#333333' }, // Peach
+      { bg: '#FFFFBA', text: '#333333' }, // Soft Yellow
+      { bg: '#BAFFC9', text: '#333333' }, // Soft Mint
+      { bg: '#BAE1FF', text: '#333333' }, // Soft Blue
+      { bg: '#E8AEFF', text: '#333333' }, // Soft Lavender
+    ],
+  },
+  {
+    id: 'monokai',
+    name: 'Dark Hacker',
+    colors: [
+      { bg: '#F92672', text: '#FFFFFF' }, // Pink
+      { bg: '#A6E22E', text: '#18181B' }, // Green
+      { bg: '#FD971F', text: '#18181B' }, // Orange
+      { bg: '#66D9EF', text: '#18181B' }, // Cyan
+      { bg: '#AE81FF', text: '#FFFFFF' }, // Purple
+      { bg: '#E6DB74', text: '#18181B' }, // Yellow
+    ],
+  },
 ];
 
-const DEFAULT_ENTRIES: WheelEntry[] = [
-  { id: '1', label: 'What is the most memorable lesson you learned from a past failure or mistake?', weight: 1 },
-  { id: '2', label: 'If you could master any skill instantly without practice, what would you choose and why?', weight: 1 },
-  { id: '3', label: 'What is one habit you adopted in the last year that significantly improved your daily life?', weight: 1 },
-  { id: '4', label: 'If you had unlimited resources to solve one problem in your community, where would you start?', weight: 1 },
-  { id: '5', label: 'What book, movie, or conversation completely changed the way you look at the world?', weight: 1 },
-  { id: '6', label: 'Describe a moment when stepping outside your comfort zone led to an unexpected reward.', weight: 1 },
-  { id: '7', label: 'If you could have a one-hour conversation with your future self ten years from now, what would you ask?', weight: 1 },
-  { id: '8', label: 'What is something most people around you agree on, but you secretly see differently?', weight: 1 },
+// Default Preset Collections
+export const SAMPLE_PRESETS = [
+  {
+    id: 'kuliner',
+    name: '🍲 Makan Apa Hari Ini?',
+    icon: Utensils,
+    items: [
+      'Nasi Goreng Spesial',
+      'Ayam Geprek Sambal Ijo',
+      'Sate Ayam Madura',
+      'Bakso Urat Kuah Pedas',
+      'Nasi Padang Lauk Rendang',
+      'Mie Ayam Jamur',
+      'Soto Ayam Lamongan',
+      'Seblak Komplit',
+      'Gado-Gado Betawi',
+      'Martabak Manis',
+    ],
+  },
+  {
+    id: 'yes_no',
+    name: '❓ Ya / Tidak / Mungkin',
+    icon: Dices,
+    items: ['YA! Lakukan!', 'TIDAK! Jangan!', 'Coba Lagi Nanti', 'Mungkin Saja', 'Pasti Ya', 'Ragu-ragu'],
+  },
+  {
+    id: 'numbers_10',
+    name: '🔢 Angka 1 - 10',
+    icon: Scale,
+    items: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+  },
+  {
+    id: 'truth_or_dare',
+    name: '🔥 Truth or Dare',
+    icon: Flame,
+    items: [
+      'TRUTH: Siapa crush kamu saat ini?',
+      'DARE: Telepon temanmu dan katakan kamu kangen!',
+      'TRUTH: Pengalaman paling memalukan di sekolah?',
+      'DARE: Nyanyikan lagu kesukaanmu dengan keras!',
+      'TRUTH: Rahasia terbesar yang belum pernah kamu ceritakan?',
+      'DARE: Biarkan grup memilih foto profil Instagram-mu!',
+    ],
+  },
+  {
+    id: 'giveaway',
+    name: '🎁 Winner Raffle / Giveaway',
+    icon: Trophy,
+    items: ['Peserta #1', 'Peserta #2', 'Peserta #3', 'Peserta #4', 'Peserta #5', 'Peserta #6', 'Peserta #7', 'Peserta #8'],
+  },
 ];
+
+const DEFAULT_ENTRIES: WheelEntry[] = SAMPLE_PRESETS[0].items.map((label, idx) => ({
+  id: `default-${idx + 1}`,
+  label,
+  weight: 1,
+}));
 
 // ==========================================
 // 3. CRYPTOGRAPHIC RANDOMIZATION MODULE
 // ==========================================
 
-/**
- * Generates a cryptographically secure random float in [0, 1) using Web Crypto API.
- * Strictly avoids Math.random() as required.
- */
 function getCryptoRandomFloat(): number {
   const array = new Uint32Array(1);
   window.crypto.getRandomValues(array);
-  // Divide by 2^32 to get a uniform float in [0, 1)
   return array[0] / 4294967296;
 }
 
-/**
- * Generates a cryptographically secure integer in [min, max] inclusive.
- */
 function getCryptoRandomInt(min: number, max: number): number {
   if (max <= min) return min;
   const range = max - min + 1;
@@ -104,9 +235,6 @@ function getCryptoRandomInt(min: number, max: number): number {
   return min + Math.floor(float * range);
 }
 
-/**
- * Performs a Fisher-Yates shuffle using Web Crypto API.
- */
 function cryptoShuffle<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -119,11 +247,12 @@ function cryptoShuffle<T>(items: T[]): T[] {
 }
 
 // ==========================================
-// 4. WEB AUDIO MECHANICAL TICK SYNTHESIZER
+// 4. MULTI-PROFILE WEB AUDIO SYNTHESIZER
 // ==========================================
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
+  public volume = 0.8;
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -139,56 +268,80 @@ class SoundEngine {
     return this.ctx;
   }
 
-  public playTick(velocityFactor = 1) {
+  public playTick(velocityFactor = 1, profile: WheelSoundProfile = 'classic') {
     try {
       const ctx = this.getContext();
-      if (!ctx) return;
+      if (!ctx || this.volume <= 0) return;
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      // Subtle wooden/mechanical peg click sound
-      osc.type = 'triangle';
-      const baseFreq = 520 + Math.min(velocityFactor * 180, 260);
-      osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.022);
-
-      gain.gain.setValueAtTime(0.14, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.022);
+      if (profile === 'arcade') {
+        osc.type = 'square';
+        const baseFreq = 440 + Math.min(velocityFactor * 300, 400);
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.03);
+        gain.gain.setValueAtTime(0.08 * this.volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+      } else if (profile === 'casino') {
+        osc.type = 'sawtooth';
+        const baseFreq = 800 + Math.min(velocityFactor * 200, 300);
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.018);
+        gain.gain.setValueAtTime(0.1 * this.volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.018);
+      } else if (profile === 'wooden') {
+        osc.type = 'triangle';
+        const baseFreq = 300 + Math.min(velocityFactor * 120, 180);
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.025);
+        gain.gain.setValueAtTime(0.2 * this.volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
+      } else {
+        // Classic
+        osc.type = 'triangle';
+        const baseFreq = 520 + Math.min(velocityFactor * 180, 260);
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.022);
+        gain.gain.setValueAtTime(0.14 * this.volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.022);
+      }
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.024);
+      osc.stop(ctx.currentTime + 0.03);
     } catch {
-      // Ignore audio errors if blocked by browser autoplay policy
+      // Ignore audio errors
     }
   }
 
-  public playWinChime() {
+  public playWinFanfare() {
     try {
       const ctx = this.getContext();
-      if (!ctx) return;
+      if (!ctx || this.volume <= 0) return;
 
-      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      // Arpeggio Fanfare (C5, E5, G5, C6, E6)
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
-        osc.type = 'sine';
-        const startTime = ctx.currentTime + idx * 0.075;
+        osc.type = idx === notes.length - 1 ? 'triangle' : 'sine';
+        const startTime = ctx.currentTime + idx * 0.08;
         osc.frequency.setValueAtTime(freq, startTime);
 
+        const vol = (idx === notes.length - 1 ? 0.22 : 0.12) * this.volume;
         gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(0.12, startTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0008, startTime + 0.45);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0008, startTime + 0.6);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
         osc.start(startTime);
-        osc.stop(startTime + 0.46);
+        osc.stop(startTime + 0.62);
       });
     } catch {
       // Ignore audio errors
@@ -205,17 +358,13 @@ const soundEngine = new SoundEngine();
 export interface ComputedSegment {
   entry: WheelEntry;
   index: number;
-  startAngle: number; // radians in [0, 2π)
-  endAngle: number;   // radians in (0, 2π]
-  sweepAngle: number; // radians
+  startAngle: number;
+  endAngle: number;
+  sweepAngle: number;
   color: { bg: string; text: string };
 }
 
-/**
- * Computes exact angular geometry for each active wheel entry.
- * Ensures adjacent segments never share the exact same color, including the wrap-around seam.
- */
-function computeWheelSegments(entries: WheelEntry[], weightMode: WeightMode): ComputedSegment[] {
+function computeWheelSegments(entries: WheelEntry[], weightMode: WeightMode, palette: Palette): ComputedSegment[] {
   const validEntries = entries.filter((e) => e.label.trim().length > 0);
   const n = validEntries.length;
   if (n === 0) return [];
@@ -227,6 +376,7 @@ function computeWheelSegments(entries: WheelEntry[], weightMode: WeightMode): Co
 
   let currentAngle = 0;
   const twoPi = Math.PI * 2;
+  const colors = palette.colors;
 
   return validEntries.map((entry, idx) => {
     const w = weightMode === 'weighted' ? Math.max(0.1, Number(entry.weight) || 1) : 1;
@@ -235,10 +385,9 @@ function computeWheelSegments(entries: WheelEntry[], weightMode: WeightMode): Co
     const endAngle = idx === n - 1 ? twoPi : currentAngle + sweep;
     currentAngle = endAngle;
 
-    // Select color ensuring last segment doesn't collide with first segment color
-    let paletteIndex = idx % WHEEL_PALETTE.length;
+    let paletteIndex = idx % colors.length;
     if (n > 1 && idx === n - 1 && paletteIndex === 0) {
-      paletteIndex = 1;
+      paletteIndex = 1 % colors.length;
     }
 
     return {
@@ -247,22 +396,17 @@ function computeWheelSegments(entries: WheelEntry[], weightMode: WeightMode): Co
       startAngle,
       endAngle,
       sweepAngle: endAngle - startAngle,
-      color: WHEEL_PALETTE[paletteIndex],
+      color: colors[paletteIndex],
     };
   });
 }
 
-/**
- * Given a wheel rotation angle (radians) and fixed pointer at top (-π/2),
- * returns the exact segment currently underneath the pointer.
- */
 function getSegmentAtPointer(rotation: number, segments: ComputedSegment[]): ComputedSegment | null {
   if (segments.length === 0) return null;
   if (segments.length === 1) return segments[0];
 
   const twoPi = Math.PI * 2;
-  const pointerAngle = -Math.PI / 2; // Top 12 o'clock position
-  // Relative angle in the wheel's local coordinate space [0, 2π)
+  const pointerAngle = -Math.PI / 2;
   const normalizedAngle = (((pointerAngle - rotation) % twoPi) + twoPi) % twoPi;
 
   for (let i = 0; i < segments.length; i++) {
@@ -274,18 +418,12 @@ function getSegmentAtPointer(rotation: number, segments: ComputedSegment[]): Com
   return segments[segments.length - 1];
 }
 
-/**
- * Parses multiline text into WheelEntry items.
- * Supports optional "Name : Weight" syntax when users type weights directly, or preserves existing IDs/weights.
- */
 function parseLinesToEntries(text: string, existingEntries: WheelEntry[]): WheelEntry[] {
   const lines = text.split(/\r?\n/);
   return lines.map((rawLine, index) => {
     const existing = existingEntries[index];
-    // Preserve ID if available
-    const id = existing?.id || `entry-${Date.now()}-${index}-${ getCryptoRandomInt(1000, 9999) }`;
+    const id = existing?.id || `entry-${Date.now()}-${index}-${getCryptoRandomInt(1000, 9999)}`;
 
-    // Check if user wrote "Name : 3" or just "Name"
     const weightMatch = rawLine.match(/^(.*?)\s*\|\s*(\d+(?:\.\d+)?)\s*$/);
     if (weightMatch) {
       return {
@@ -303,17 +441,71 @@ function parseLinesToEntries(text: string, existingEntries: WheelEntry[]): Wheel
   });
 }
 
+// Confetti blast helper
+function triggerVictoryConfetti() {
+  try {
+    const count = 200;
+    const defaults = {
+      origin: { y: 0.65 },
+      zIndex: 9999,
+    };
+
+    function fire(particleRatio: number, opts: confetti.Options) {
+      void confetti({
+        ...defaults,
+        ...opts,
+        particleCount: Math.floor(count * particleRatio),
+      });
+    }
+
+    fire(0.25, {
+      spread: 26,
+      startVelocity: 55,
+    });
+    fire(0.2, {
+      spread: 60,
+    });
+    fire(0.35, {
+      spread: 100,
+      decay: 0.91,
+      scalar: 0.8,
+    });
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 25,
+      decay: 0.92,
+      scalar: 1.2,
+    });
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 45,
+    });
+  } catch {
+    // Ignore confetti errors
+  }
+}
+
 // ==========================================
 // 6. MAIN APPLICATION COMPONENT
 // ==========================================
 
 export default function App() {
-  // --- Application State ---
+  // --- App State ---
   const [entries, setEntries] = useState<WheelEntry[]>(DEFAULT_ENTRIES);
   const [weightMode, setWeightMode] = useState<WeightMode>('equal');
-  const [editorTab, setEditorTab] = useState<EditorTab>('bulk');
+  const [editorTab, setEditorTab] = useState<EditorTab>('text');
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [soundVolume, setSoundVolume] = useState<number>(0.8);
+  const [soundProfile, setSoundProfile] = useState<WheelSoundProfile>('classic');
+  const [selectedPaletteId, setSelectedPaletteId] = useState<string>('vibrant');
+  const [pointerStyle, setPointerStyle] = useState<PointerStyle>('classic');
+  const [spinDurationSec, setSpinDurationSec] = useState<number>(4);
+  const [centerText, setCenterText] = useState<string>('SPIN');
+  const [eliminationMode, setEliminationMode] = useState<boolean>(false);
+  const [roundNumber, setRoundNumber] = useState<number>(1);
+  const [history, setHistory] = useState<WinnerRecord[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
   // Spin & Winner state
@@ -322,46 +514,57 @@ export default function App() {
   const [showWinnerModal, setShowWinnerModal] = useState<boolean>(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [pointerKick, setPointerKick] = useState<number>(0);
+  const [ledPhase, setLedPhase] = useState<number>(0);
 
-  // UI Dialogs & Confirmations
-  const [activeModal, setActiveModal] = useState<'about' | 'help' | null>(null);
+  // UI Dialogs
+  const [activeModal, setActiveModal] = useState<'about' | 'help' | 'settings' | null>(null);
   const [confirmingClear, setConfirmingClear] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [newItemLabel, setNewItemLabel] = useState<string>('');
-  const [newItemWeight, setNewItemWeight] = useState<number>(1);
+  const [copiedToast, setCopiedToast] = useState<boolean>(false);
 
-  // Refs for Canvas & Animation Engine
+  // Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rotationRef = useRef<number>(0);
   const animFrameRef = useRef<number | null>(null);
   const pointerKickDecayRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const ledTimerRef = useRef<number | null>(null);
 
-  // Active segments (non-empty lines)
+  // Current active palette object
+  const activePalette = useMemo(() => {
+    return WHEEL_PALETTES.find((p) => p.id === selectedPaletteId) || WHEEL_PALETTES[0];
+  }, [selectedPaletteId]);
+
+  // Active computed segments
   const activeSegments = useMemo(
-    () => computeWheelSegments(entries, weightMode),
-    [entries, weightMode]
+    () => computeWheelSegments(entries, weightMode, activePalette),
+    [entries, weightMode, activePalette]
   );
 
-  // Bulk textarea value derived from entries
+  // Bulk text derived value
   const bulkTextValue = useMemo(
     () => entries.map((e) => e.label).join('\n'),
     [entries]
   );
 
-  // Show temporary status toast
+  // Toast notification trigger
   const triggerToast = useCallback((msg: string) => {
     setStatusMessage(msg);
   }, []);
 
-  // --- LocalStorage Restoration & Persistence ---
+  // Synchronize sound engine volume
+  useEffect(() => {
+    soundEngine.volume = soundEnabled ? soundVolume : 0;
+  }, [soundEnabled, soundVolume]);
+
+  // --- LocalStorage Restoration ---
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.entries)) {
+        if (Array.isArray(parsed.entries) && parsed.entries.length > 0) {
           setEntries(parsed.entries);
         }
         if (parsed.weightMode === 'equal' || parsed.weightMode === 'weighted') {
@@ -373,9 +576,30 @@ export default function App() {
         if (typeof parsed.soundEnabled === 'boolean') {
           setSoundEnabled(parsed.soundEnabled);
         }
+        if (typeof parsed.soundVolume === 'number') {
+          setSoundVolume(parsed.soundVolume);
+        }
+        if (parsed.selectedPaletteId) {
+          setSelectedPaletteId(parsed.selectedPaletteId);
+        }
+        if (parsed.pointerStyle) {
+          setPointerStyle(parsed.pointerStyle);
+        }
+        if (parsed.spinDurationSec) {
+          setSpinDurationSec(parsed.spinDurationSec);
+        }
+        if (typeof parsed.centerText === 'string') {
+          setCenterText(parsed.centerText);
+        }
+        if (typeof parsed.eliminationMode === 'boolean') {
+          setEliminationMode(parsed.eliminationMode);
+        }
+        if (Array.isArray(parsed.history)) {
+          setHistory(parsed.history);
+        }
       }
     } catch {
-      // Ignore storage access errors
+      // Ignore storage errors
     } finally {
       setIsHydrated(true);
     }
@@ -391,12 +615,19 @@ export default function App() {
           weightMode,
           theme,
           soundEnabled,
+          soundVolume,
+          selectedPaletteId,
+          pointerStyle,
+          spinDurationSec,
+          centerText,
+          eliminationMode,
+          history,
         })
       );
     } catch {
-      // Ignore quota or storage errors
+      // Ignore quota errors
     }
-  }, [entries, weightMode, theme, soundEnabled, isHydrated]);
+  }, [entries, weightMode, theme, soundEnabled, soundVolume, selectedPaletteId, pointerStyle, spinDurationSec, centerText, eliminationMode, history, isHydrated]);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -404,7 +635,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [statusMessage]);
 
-  // --- Theme Synchronization ---
+  // --- Theme Sync ---
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -414,14 +645,33 @@ export default function App() {
     }
   }, [theme]);
 
-  // --- Canvas High-DPI Wheel Renderer ---
+  // --- Outer LED Lights Animation Cycle ---
+  useEffect(() => {
+    if (isSpinning) {
+      ledTimerRef.current = window.setInterval(() => {
+        setLedPhase((prev) => (prev + 1) % 12);
+      }, 70);
+    } else {
+      if (ledTimerRef.current !== null) {
+        clearInterval(ledTimerRef.current);
+        ledTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (ledTimerRef.current !== null) {
+        clearInterval(ledTimerRef.current);
+      }
+    };
+  }, [isSpinning]);
+
+  // --- High-DPI Canvas Wheel Renderer ---
   const drawWheel = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
     const rect = container.getBoundingClientRect();
-    const size = Math.max(240, Math.min(rect.width, rect.height));
+    const size = Math.max(220, Math.min(rect.width, rect.height));
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
     if (canvas.width !== Math.floor(size * dpr) || canvas.height !== Math.floor(size * dpr)) {
@@ -440,8 +690,7 @@ export default function App() {
 
     const cx = size / 2;
     const cy = size / 2;
-    // Leave padding for the top pointer and outer rim
-    const outerRadius = size / 2 - 18;
+    const outerRadius = size / 2 - 20;
     const rotation = rotationRef.current;
 
     const isDark = theme === 'dark';
@@ -449,16 +698,36 @@ export default function App() {
     const surfaceColor = isDark ? '#18181B' : '#FFFFFF';
     const mutedTextColor = isDark ? '#A1A1AA' : '#71717A';
 
-    // Outer subtle rim ring
+    // 1. Outer rim ring
     ctx.beginPath();
-    ctx.arc(cx, cy, outerRadius + 5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, outerRadius + 6, 0, Math.PI * 2);
     ctx.fillStyle = surfaceColor;
     ctx.fill();
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.strokeStyle = borderColor;
     ctx.stroke();
 
-    // Case 0: Empty Wheel
+    // 2. Casino LED Dots along the outer rim
+    const totalLeds = 16;
+    for (let i = 0; i < totalLeds; i++) {
+      const ledAngle = (i / totalLeds) * Math.PI * 2;
+      const lx = cx + Math.cos(ledAngle) * (outerRadius + 3);
+      const ly = cy + Math.sin(ledAngle) * (outerRadius + 3);
+
+      const isLit = isSpinning ? (i + ledPhase) % 3 === 0 : i % 2 === 0;
+      ctx.beginPath();
+      ctx.arc(lx, ly, isLit ? 3.2 : 2, 0, Math.PI * 2);
+      ctx.fillStyle = isLit
+        ? isDark
+          ? '#F59E0B'
+          : '#EAB308'
+        : isDark
+        ? '#3F3F46'
+        : '#D4D4D8';
+      ctx.fill();
+    }
+
+    // 3. Empty Wheel Case
     if (activeSegments.length === 0) {
       ctx.beginPath();
       ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
@@ -469,17 +738,17 @@ export default function App() {
       ctx.stroke();
 
       ctx.fillStyle = mutedTextColor;
-      ctx.font = '500 14px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = '500 14px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Add entries on the right to spin', cx, cy - 48);
+      ctx.fillText('Tambah entri di kanan untuk memutar', cx, cy - 10);
       ctx.restore();
       return;
     }
 
-    // Draw each segment
+    // 4. Draw Segments
     const n = activeSegments.length;
-    const innerHubRadius = Math.max(34, outerRadius * 0.17);
+    const innerHubRadius = Math.max(34, outerRadius * 0.18);
 
     activeSegments.forEach((seg, idx) => {
       const start = rotation + seg.startAngle;
@@ -498,9 +767,9 @@ export default function App() {
       ctx.fillStyle = seg.color.bg;
       ctx.fill();
 
-      // Dim non-winning segments slightly when a winner is highlighted
+      // Dim non-highlighted segments on winner reveal
       if (highlightedIndex !== null && !isHighlighted) {
-        ctx.fillStyle = isDark ? 'rgba(9, 9, 11, 0.42)' : 'rgba(255, 255, 255, 0.38)';
+        ctx.fillStyle = isDark ? 'rgba(9, 9, 11, 0.45)' : 'rgba(255, 255, 255, 0.45)';
         ctx.fill();
       }
 
@@ -511,7 +780,7 @@ export default function App() {
         ctx.stroke();
       }
 
-      // Highlight ring on winning segment
+      // Highlight winner ring
       if (isHighlighted) {
         ctx.save();
         ctx.beginPath();
@@ -522,14 +791,14 @@ export default function App() {
           ctx.arc(cx, cy, outerRadius - 1.5, start, end);
           ctx.closePath();
         }
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3.5;
         ctx.strokeStyle = '#FFFFFF';
         ctx.stroke();
         ctx.restore();
       }
     });
 
-    // Draw radial segment labels
+    // 5. Draw Labels
     activeSegments.forEach((seg) => {
       const midAngle = rotation + seg.startAngle + seg.sweepAngle / 2;
 
@@ -537,27 +806,23 @@ export default function App() {
       ctx.translate(cx, cy);
       ctx.rotate(midAngle);
 
-      // Available chord height at 65% radius determines max comfortable font size
       const labelRadius = outerRadius * 0.64;
       const arcHeight = seg.sweepAngle * labelRadius;
       const fontSize = Math.max(8.5, Math.min(15, arcHeight * 0.52, outerRadius * 0.068));
 
-      // Skip rendering text only if segment is sub-pixel thin (> 180 segments)
       if (arcHeight > 4.5) {
-        ctx.font = `500 ${fontSize.toFixed(1)}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.font = `600 ${fontSize.toFixed(1)}px Inter, sans-serif`;
         ctx.fillStyle = seg.color.text;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
-        const maxTextWidth = outerRadius - innerHubRadius - 24;
+        const maxTextWidth = outerRadius - innerHubRadius - 22;
         let displayLabel = seg.entry.label.trim();
 
-        // Add subtle weight badge if in weighted mode and weight !== 1
         if (weightMode === 'weighted' && seg.entry.weight !== 1 && n <= 40) {
           displayLabel = `${displayLabel} (${seg.entry.weight}×)`;
         }
 
-        // Truncate cleanly with ellipsis if needed
         if (ctx.measureText(displayLabel).width > maxTextWidth) {
           const ellipsis = '…';
           let low = 0;
@@ -580,7 +845,7 @@ export default function App() {
       ctx.restore();
     });
 
-    // Draw subtle rim pegs when segment count is reasonable
+    // 6. Draw Rim Pegs
     if (n > 1 && n <= 60) {
       activeSegments.forEach((seg) => {
         const pegAngle = rotation + seg.startAngle;
@@ -595,9 +860,8 @@ export default function App() {
     }
 
     ctx.restore();
-  }, [activeSegments, highlightedIndex, theme, weightMode]);
+  }, [activeSegments, highlightedIndex, theme, weightMode, isSpinning, ledPhase]);
 
-  // Redraw whenever dependencies or container size changes
   useEffect(() => {
     drawWheel();
   }, [drawWheel]);
@@ -613,7 +877,6 @@ export default function App() {
     return () => observer.disconnect();
   }, [drawWheel]);
 
-  // Clean up animation frame on unmount
   useEffect(() => {
     return () => {
       if (animFrameRef.current !== null) {
@@ -622,7 +885,7 @@ export default function App() {
     };
   }, []);
 
-  // --- Spin Engine & Cryptographic Winner Synchronization ---
+  // --- Spin Engine ---
   const spinWheel = useCallback(() => {
     if (isSpinning || activeSegments.length === 0) return;
 
@@ -632,7 +895,7 @@ export default function App() {
     setHighlightedIndex(null);
     setConfirmingClear(false);
 
-    // 1. Select winner strictly using Web Crypto API
+    // 1. Pick winner using Web Crypto
     const totalWeight = activeSegments.reduce(
       (sum, seg) => sum + (weightMode === 'weighted' ? Math.max(0.1, Number(seg.entry.weight) || 1) : 1),
       0
@@ -653,13 +916,13 @@ export default function App() {
       }
     }
 
-    // 2. Pick a random landing offset inside the chosen segment (within central 72% to avoid borderline ambiguity)
+    // 2. Landing angle inside segment
     const margin = chosenSegment.sweepAngle * 0.14;
     const innerSweep = Math.max(0.001, chosenSegment.sweepAngle - margin * 2);
     const angleInsideSegment =
       chosenSegment.startAngle + margin + getCryptoRandomFloat() * innerSweep;
 
-    // 3. Calculate target rotation so that `angleInsideSegment` lands directly under the top pointer (-π/2)
+    // 3. Align angle under pointer at top (-π/2)
     const twoPi = Math.PI * 2;
     const pointerAngle = -Math.PI / 2;
     const desiredMod = (((pointerAngle - angleInsideSegment) % twoPi) + twoPi) % twoPi;
@@ -671,13 +934,11 @@ export default function App() {
       deltaMod += twoPi;
     }
 
-    // Add 6 to 9 full rotations for satisfying momentum
-    const fullSpins = getCryptoRandomInt(6, 9);
+    const fullSpins = getCryptoRandomInt(6, 10);
     const totalDelta = fullSpins * twoPi + deltaMod;
     const targetRotation = startRotation + totalDelta;
 
-    // Duration between 4.4s and 5.2s
-    const duration = 4400 + getCryptoRandomFloat() * 800;
+    const duration = spinDurationSec * 1000;
     const startTime = performance.now();
 
     let previousSegmentIndex =
@@ -687,10 +948,9 @@ export default function App() {
       const elapsed = now - startTime;
       const t = Math.min(1, elapsed / duration);
 
-      // Smooth two-stage easing: brief initial torque ramp + long quintic friction deceleration
-      const accelBreakpoint = 0.09;
+      const accelBreakpoint = 0.08;
       let progress: number;
-      const k = 5; // quintic deceleration exponent
+      const k = 5.2; // quintic friction
       const vMax = k / (1 + (k - 1) * accelBreakpoint);
 
       if (t < accelBreakpoint) {
@@ -704,15 +964,15 @@ export default function App() {
       const currentRotation = startRotation + totalDelta * progress;
       rotationRef.current = currentRotation;
 
-      // Detect segment boundary crossing under the top pointer for mechanical tick feedback
+      // Pointer tick feedback
       const currentSeg = getSegmentAtPointer(currentRotation, activeSegments);
       if (currentSeg && currentSeg.index !== previousSegmentIndex) {
         previousSegmentIndex = currentSeg.index;
-        const remainingSpeed = Math.max(0.15, 1 - t);
+        const remainingSpeed = Math.max(0.12, 1 - t);
         if (soundEnabled) {
-          soundEngine.playTick(remainingSpeed);
+          soundEngine.playTick(remainingSpeed, soundProfile);
         }
-        pointerKickDecayRef.current = Math.min(20, 7 + remainingSpeed * 14);
+        pointerKickDecayRef.current = Math.min(22, 8 + remainingSpeed * 15);
         setPointerKick(pointerKickDecayRef.current);
       } else if (pointerKickDecayRef.current > 0.2) {
         pointerKickDecayRef.current *= 0.82;
@@ -727,31 +987,44 @@ export default function App() {
       if (t < 1) {
         animFrameRef.current = requestAnimationFrame(animate);
       } else {
-        // Ensure exact final angle alignment and verify synchronized winner
         rotationRef.current = targetRotation % twoPi;
         setPointerKick(0);
         setIsSpinning(false);
 
         const finalSeg = getSegmentAtPointer(rotationRef.current, activeSegments) || chosenSegment;
         setHighlightedIndex(finalSeg.index);
-        setWinner({
+
+        const newRecord: WinnerRecord = {
+          id: `win-${Date.now()}`,
           entry: finalSeg.entry,
           index: finalSeg.index,
           timestamp: Date.now(),
-        });
+          roundNumber: eliminationMode ? roundNumber : undefined,
+        };
+
+        setWinner(newRecord);
+        setHistory((prev) => [newRecord, ...prev]);
         setShowWinnerModal(true);
 
         if (soundEnabled) {
-          soundEngine.playWinChime();
+          soundEngine.playWinFanfare();
         }
+
+        // Trigger confetti burst
+        triggerVictoryConfetti();
+
+        if (eliminationMode) {
+          setRoundNumber((r) => r + 1);
+        }
+
         drawWheel();
       }
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, [isSpinning, activeSegments, weightMode, soundEnabled, drawWheel]);
+  }, [isSpinning, activeSegments, weightMode, soundEnabled, soundProfile, spinDurationSec, eliminationMode, roundNumber, drawWheel]);
 
-  // --- Entry Management Handlers ---
+  // --- Handlers ---
   const handleBulkTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (isSpinning) return;
     const updated = parseLinesToEntries(e.target.value, entries);
@@ -763,7 +1036,7 @@ export default function App() {
     if (isSpinning || entries.length <= 1) return;
     setEntries((prev) => cryptoShuffle(prev));
     setHighlightedIndex(null);
-    triggerToast('Entries shuffled');
+    triggerToast('Daftar entri diacak!');
   };
 
   const handleClearAll = () => {
@@ -773,7 +1046,7 @@ export default function App() {
     setShowWinnerModal(false);
     setHighlightedIndex(null);
     setConfirmingClear(false);
-    triggerToast('All entries cleared');
+    triggerToast('Semua entri telah dihapus');
   };
 
   const handleRemoveWinner = () => {
@@ -783,14 +1056,13 @@ export default function App() {
     setWinner(null);
     setShowWinnerModal(false);
     setHighlightedIndex(null);
-    triggerToast('Removed selected question');
+    triggerToast(`Dihapus: "${winner.entry.label}"`);
   };
 
   const handleSpinAgain = () => {
     setWinner(null);
     setShowWinnerModal(false);
     setHighlightedIndex(null);
-    // Trigger immediate fresh spin on next microtask
     setTimeout(() => {
       spinWheel();
     }, 16);
@@ -824,36 +1096,29 @@ export default function App() {
     setHighlightedIndex(null);
   };
 
-  const handleAddSingleEntry = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSpinning || !newItemLabel.trim()) return;
-    const newEntry: WheelEntry = {
-      id: `entry-${Date.now()}-${getCryptoRandomInt(1000, 9999)}`,
-      label: newItemLabel.trim(),
-      weight: Math.max(1, Math.min(99, Number(newItemWeight) || 1)),
-    };
-    setEntries((prev) => [...prev, newEntry]);
-    setNewItemLabel('');
-    setNewItemWeight(1);
-    setHighlightedIndex(null);
-  };
-
-  const handleLoadSamplePreset = () => {
+  const handleLoadPreset = (presetItems: string[]) => {
     if (isSpinning) return;
-    setEntries(DEFAULT_ENTRIES);
+    const newEntries: WheelEntry[] = presetItems.map((label, idx) => ({
+      id: `preset-${Date.now()}-${idx}`,
+      label,
+      weight: 1,
+    }));
+    setEntries(newEntries);
     setWinner(null);
     setHighlightedIndex(null);
-    triggerToast('Sample entries restored');
+    setRoundNumber(1);
+    triggerToast('Preset berhasil dimuat!');
   };
 
-  // --- JSON Import & Export ---
   const handleExportJSON = () => {
     const payload: WheelConfigExport = {
-      version: 1,
+      version: 2,
       weightMode,
+      paletteId: selectedPaletteId,
       entries: entries
         .filter((e) => e.label.trim().length > 0)
         .map((e) => ({ label: e.label.trim(), weight: e.weight })),
+      history,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -867,7 +1132,7 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    triggerToast('Configuration exported as JSON');
+    triggerToast('Konfigurasi diekspor sebagai JSON');
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -879,7 +1144,7 @@ export default function App() {
       try {
         const raw = JSON.parse(String(event.target?.result || '{}'));
         if (!Array.isArray(raw.entries)) {
-          triggerToast('Invalid JSON format: missing entries array');
+          triggerToast('Format JSON salah: tidak ada array entries');
           return;
         }
 
@@ -895,13 +1160,19 @@ export default function App() {
         if (raw.weightMode === 'equal' || raw.weightMode === 'weighted') {
           setWeightMode(raw.weightMode);
         }
+        if (raw.paletteId && WHEEL_PALETTES.some((p) => p.id === raw.paletteId)) {
+          setSelectedPaletteId(raw.paletteId);
+        }
+        if (Array.isArray(raw.history)) {
+          setHistory(raw.history);
+        }
 
         setEntries(importedEntries);
         setWinner(null);
         setHighlightedIndex(null);
-        triggerToast(`Imported ${importedEntries.length} entries`);
+        triggerToast(`Berhasil mengimpor ${importedEntries.length} entri`);
       } catch {
-        triggerToast('Could not parse JSON file');
+        triggerToast('Gagal membaca berkas JSON');
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -911,13 +1182,46 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // Keyboard shortcut: Ctrl/Cmd + Enter to Spin
+  const handleCopyWinner = () => {
+    if (!winner) return;
+    navigator.clipboard.writeText(winner.entry.label).then(() => {
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 2000);
+    });
+  };
+
+  // Toggle Fullscreen mode
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        }).catch(() => {});
+      }
+    }
+  };
+
+  // Keyboard shortcut: Spacebar / Enter to spin, F to fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        spinWheel();
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      const isInputActive = activeTag === 'input' || activeTag === 'textarea';
+
+      if (!isInputActive) {
+        if (e.code === 'Space' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
+          e.preventDefault();
+          spinWheel();
+        }
+        if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          toggleFullscreen();
+        }
       }
+
       if (e.key === 'Escape') {
         if (showWinnerModal) {
           setShowWinnerModal(false);
@@ -926,18 +1230,22 @@ export default function App() {
         }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [spinWheel, activeModal, showWinnerModal]);
+  }, [spinWheel, showWinnerModal, activeModal]);
 
   const isDark = theme === 'dark';
 
+  // Calculate total weights & probabilities for stats tab
+  const totalWeight = useMemo(() => {
+    return activeSegments.reduce((sum, seg) => sum + (weightMode === 'weighted' ? seg.entry.weight : 1), 0);
+  }, [activeSegments, weightMode]);
+
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-150 ${
-        isDark
-          ? 'bg-[#09090B] text-[#FAFAFA]'
-          : 'bg-[#FAFAFA] text-[#18181B]'
+      className={`min-h-screen flex flex-col transition-colors duration-200 ${
+        isDark ? 'bg-[#09090B] text-[#FAFAFA]' : 'bg-[#FAFAFA] text-[#18181B]'
       }`}
       style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
@@ -946,146 +1254,171 @@ export default function App() {
       ========================================== */}
       <header
         className={`h-14 border-b px-4 sm:px-6 flex items-center justify-between shrink-0 ${
-          isDark
-            ? 'bg-[#121215] border-[#27272A]'
-            : 'bg-[#FFFFFF] border-[#E4E4E7]'
+          isDark ? 'bg-[#121215] border-[#27272A]' : 'bg-[#FFFFFF] border-[#E4E4E7]'
         }`}
       >
         {/* Brand */}
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-[#6366F1] flex items-center justify-center text-white shadow-xs">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="w-4 h-4"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <circle cx="12" cy="12" r="2.5" />
-              <line x1="12" y1="3" x2="12" y2="9.5" />
-              <line x1="19.79" y1="16.5" x2="14.16" y2="13.25" />
-              <line x1="4.21" y1="16.5" x2="9.84" y2="13.25" />
-            </svg>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-white shadow-md">
+            <Sparkles className="w-4 h-4" />
           </div>
-          <span className="font-medium text-base tracking-tight">Wheel</span>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-base tracking-tight">Wheel of Questions</span>
+            <span className="hidden sm:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-2xs">
+              GACOR PRO
+            </span>
+          </div>
         </div>
 
-        {/* Navigation & Utilities */}
+        {/* Header Actions */}
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
           <button
             type="button"
-            onClick={() => setActiveModal('about')}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            onClick={() => setActiveModal('settings')}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               isDark
                 ? 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#27272A]/60'
                 : 'text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5]'
             }`}
           >
-            <Info className="w-3.5 h-3.5" />
-            <span>About</span>
+            <Settings className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tema & Suara</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveModal('help')}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               isDark
                 ? 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#27272A]/60'
                 : 'text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5]'
             }`}
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>Help</span>
+            <span className="hidden sm:inline">Bantuan</span>
           </button>
 
-          <div
-            className={`h-4 w-[1px] mx-1 ${
-              isDark ? 'bg-[#27272A]' : 'bg-[#E4E4E7]'
-            }`}
-          />
+          <div className={`h-4 w-[1px] mx-1 ${isDark ? 'bg-[#27272A]' : 'bg-[#E4E4E7]'}`} />
 
           <button
             type="button"
-            onClick={() => setSoundEnabled((prev) => !prev)}
-            title={soundEnabled ? 'Mute sound effects' : 'Enable sound effects'}
-            aria-label={soundEnabled ? 'Mute sound effects' : 'Enable sound effects'}
-            className={`p-2 rounded-md transition-colors ${
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Keluar Fullscreen (F)' : 'Mode Fullscreen / Layar Penuh (F)'}
+            aria-label="Toggle Fullscreen"
+            className={`p-2 rounded-md transition-colors cursor-pointer ${
               isDark
                 ? 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#27272A]/60'
                 : 'text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5]'
             }`}
           >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
-            )}
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSoundEnabled((prev) => !prev)}
+            title={soundEnabled ? 'Mute Suara' : 'Aktifkan Suara'}
+            aria-label="Toggle Mute Sound"
+            className={`p-2 rounded-md transition-colors cursor-pointer ${
+              isDark
+                ? 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#27272A]/60'
+                : 'text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5]'
+            }`}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-[#6366F1]" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
           <button
             type="button"
             onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-            title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            className={`p-2 rounded-md transition-colors ${
+            title={isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
+            aria-label="Toggle Theme"
+            className={`p-2 rounded-md transition-colors cursor-pointer ${
               isDark
                 ? 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#27272A]/60'
                 : 'text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5]'
             }`}
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </button>
         </nav>
       </header>
 
       {/* ==========================================
-          MAIN TWO-COLUMN WORKSPACE
+          MAIN WORKSPACE
       ========================================== */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 lg:py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* LEFT PANEL — WHEEL STAGE */}
         <section
-          aria-label="Spinning Wheel"
+          aria-label="Roda Acak"
           className="lg:col-span-7 flex flex-col items-center justify-center w-full"
         >
+          {/* Preset Quick Loader Strip */}
+          <div className="w-full max-w-[min(490px,max(220px,calc(100svh-140px)))] mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 shrink-0 mr-1">
+              Presets:
+            </span>
+            {SAMPLE_PRESETS.map((p) => {
+              const IconComp = p.icon;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleLoadPreset(p.items)}
+                  disabled={isSpinning}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-all shrink-0 flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                    isDark
+                      ? 'bg-[#18181B] border-[#27272A] hover:border-[#6366F1] text-[#A1A1AA] hover:text-white'
+                      : 'bg-white border-[#E4E4E7] hover:border-[#6366F1] text-[#71717A] hover:text-[#18181B]'
+                  }`}
+                >
+                  <IconComp className="w-3 h-3 shrink-0" />
+                  <span>{p.name.split(' ')[1] || p.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* Wheel Interactive Container */}
           <div
             ref={containerRef}
             className="relative w-full max-w-[min(490px,max(220px,calc(100svh-140px)))] aspect-square flex items-center justify-center select-none"
           >
-            {/* Fixed Top Pointer at 12 o'clock */}
+            {/* Top Pointer Indicator */}
             <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+              className="absolute top-0 left-1/2 -translate-x-1/2 z-20 pointer-events-none drop-shadow-md"
               style={{
                 transform: `translateX(-50%) rotate(${-pointerKick}deg)`,
                 transformOrigin: '50% 6px',
                 transition: isSpinning ? 'none' : 'transform 150ms ease-out',
               }}
             >
-              <svg
-                width="32"
-                height="36"
-                viewBox="0 0 32 36"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-sm"
-              >
-                <path
-                  d="M16 34L4 10C2.6 7.2 4.6 4 7.8 4H24.2C27.4 4 29.4 7.2 28 10L16 34Z"
-                  fill={isDark ? '#FAFAFA' : '#18181B'}
-                  stroke={isDark ? '#18181B' : '#FFFFFF'}
-                  strokeWidth="2.2"
-                  strokeLinejoin="round"
-                />
-                <circle
-                  cx="16"
-                  cy="10"
-                  r="3"
-                  fill="#6366F1"
-                />
-              </svg>
+              {pointerStyle === 'crown' ? (
+                <div className="flex flex-col items-center text-amber-400">
+                  <Crown className="w-7 h-7 fill-amber-400 drop-shadow-sm" />
+                </div>
+              ) : pointerStyle === 'flame' ? (
+                <div className="flex flex-col items-center text-rose-500">
+                  <Flame className="w-7 h-7 fill-rose-500 drop-shadow-sm" />
+                </div>
+              ) : (
+                <svg
+                  width="34"
+                  height="38"
+                  viewBox="0 0 32 36"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M16 34L4 10C2.6 7.2 4.6 4 7.8 4H24.2C27.4 4 29.4 7.2 28 10L16 34Z"
+                    fill={isDark ? '#FAFAFA' : '#18181B'}
+                    stroke={isDark ? '#18181B' : '#FFFFFF'}
+                    strokeWidth="2.2"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="16" cy="10" r="3" fill="#6366F1" />
+                </svg>
+              )}
             </div>
 
             {/* HTML5 Canvas Wheel */}
@@ -1093,9 +1426,7 @@ export default function App() {
               ref={canvasRef}
               onClick={spinWheel}
               className={`rounded-full transition-opacity ${
-                activeSegments.length > 0 && !isSpinning
-                  ? 'cursor-pointer'
-                  : 'cursor-default'
+                activeSegments.length > 0 && !isSpinning ? 'cursor-pointer' : 'cursor-default'
               }`}
               aria-label="Random Picker Wheel Canvas"
             />
@@ -1106,52 +1437,52 @@ export default function App() {
               onClick={spinWheel}
               disabled={isSpinning || activeSegments.length === 0}
               aria-label="Spin the wheel"
-              className={`absolute z-20 w-18 h-18 sm:w-20 sm:h-20 rounded-full font-medium text-xs sm:text-sm tracking-wide uppercase transition-all flex flex-col items-center justify-center border-4 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1] focus-visible:ring-offset-2 ${
+              className={`absolute z-20 w-18 h-18 sm:w-20 sm:h-20 rounded-full font-bold text-xs sm:text-sm tracking-wide uppercase transition-all flex flex-col items-center justify-center border-4 shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1] ${
                 isDark
                   ? 'bg-[#18181B] text-[#FAFAFA] border-[#27272A] hover:border-[#6366F1]'
                   : 'bg-[#FFFFFF] text-[#18181B] border-[#E4E4E7] hover:border-[#6366F1]'
               } ${
                 isSpinning || activeSegments.length === 0
-                  ? 'opacity-60 cursor-not-allowed'
-                  : 'hover:scale-105 active:scale-95 cursor-pointer'
+                  ? 'opacity-70 cursor-not-allowed'
+                  : 'hover:scale-108 active:scale-95 cursor-pointer'
               }`}
             >
-              <span className="font-semibold">
-                {isSpinning ? '•••' : 'Spin'}
+              <span className="font-extrabold text-sm sm:text-base text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">
+                {isSpinning ? '•••' : centerText}
               </span>
             </button>
           </div>
 
-          {/* Winner Banner / Live Result Card */}
+          {/* Winner Banner / Live Status Card */}
           <div className="w-full max-w-[min(490px,max(220px,calc(100svh-140px)))] mt-4 min-h-[92px]">
             {winner ? (
               <div
                 role="status"
                 aria-live="polite"
-                className={`w-full rounded-lg border p-4 transition-all ${
+                className={`w-full rounded-xl border p-4 transition-all shadow-sm ${
                   isDark
                     ? 'bg-[#121215] border-[#27272A]'
                     : 'bg-[#FFFFFF] border-[#E4E4E7]'
-                } shadow-xs`}
+                }`}
               >
                 <div className="flex flex-col gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase text-[#6366F1]">
+                      <div className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase text-[#6366F1]">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                        <span>THE QUESTION IS :</span>
+                        <span>
+                          {eliminationMode ? `ROUND ${roundNumber - 1} WINNER:` : 'HASIL UNDIAN:'}
+                        </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setShowWinnerModal(true)}
-                        className="text-xs text-[#6366F1] hover:underline font-medium shrink-0 cursor-pointer"
+                        className="text-xs text-[#6366F1] hover:underline font-semibold shrink-0 cursor-pointer"
                       >
-                        View Pop-up
+                        Pop-up Pemenang
                       </button>
                     </div>
-                    <h2
-                      className="text-base sm:text-lg font-medium tracking-tight leading-snug break-words mt-1.5"
-                    >
+                    <h2 className="text-base sm:text-lg font-bold tracking-tight leading-snug break-words mt-1.5">
                       {winner.entry.label}
                     </h2>
                   </div>
@@ -1160,29 +1491,29 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleSpinAgain}
-                      className="px-3.5 py-2 rounded-md text-xs font-medium bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
-                      <span>Spin Again</span>
+                      <span>Putar Lagi</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleRemoveWinner}
-                      className={`px-3.5 py-2 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                      className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
                         isDark
                           ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#FAFAFA]'
                           : 'border-[#E4E4E7] bg-[#FAFAFA] hover:bg-[#F4F4F5] text-[#18181B]'
                       }`}
                     >
-                      <UserMinus className="w-3.5 h-3.5" />
-                      <span>Remove</span>
+                      <UserMinus className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Hapus Pemenang</span>
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
               <div
-                className={`w-full rounded-lg border px-4 py-3.5 flex items-center justify-between text-xs ${
+                className={`w-full rounded-xl border px-4 py-3 flex items-center justify-between text-xs ${
                   isDark
                     ? 'bg-[#121215]/60 border-[#27272A] text-[#A1A1AA]'
                     : 'bg-[#FFFFFF] border-[#E4E4E7] text-[#71717A]'
@@ -1190,122 +1521,134 @@ export default function App() {
               >
                 <span>
                   {isSpinning
-                    ? 'Spinning wheel...'
+                    ? 'Memutar roda...'
                     : activeSegments.length === 0
-                    ? 'No active entries on the wheel.'
-                    : `Ready to pick from ${activeSegments.length} ${
-                        activeSegments.length === 1 ? 'entry' : 'entries'
-                      }.`}
+                    ? 'Tidak ada entri di roda.'
+                    : `Siap memutar dari ${activeSegments.length} entri.`}
                 </span>
                 <span className="hidden sm:inline font-mono text-[11px] opacity-75">
-                  ⌘ / Ctrl + Enter
+                  Tekan [Space] untuk memutar
                 </span>
               </div>
             )}
           </div>
         </section>
 
-        {/* RIGHT PANEL — ENTRY EDITOR */}
+        {/* RIGHT PANEL — ENTRY EDITOR & TABBED HUB */}
         <section
           aria-label="Entry Editor"
-          className={`lg:col-span-5 w-full rounded-lg border flex flex-col ${
-            isDark
-              ? 'bg-[#121215] border-[#27272A]'
-              : 'bg-[#FFFFFF] border-[#E4E4E7]'
+          className={`lg:col-span-5 w-full rounded-xl border flex flex-col ${
+            isDark ? 'bg-[#121215] border-[#27272A]' : 'bg-[#FFFFFF] border-[#E4E4E7]'
           }`}
         >
-          {/* Panel Header */}
+          {/* Tab Navigation */}
           <div
-            className={`p-4 border-b flex items-center justify-between gap-2 ${
+            className={`p-3 border-b flex items-center justify-between gap-2 ${
               isDark ? 'border-[#27272A]' : 'border-[#E4E4E7]'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <h1 className="font-medium text-sm tracking-tight">Entries</h1>
-              <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                  isDark
-                    ? 'bg-[#18181B] border-[#27272A] text-[#A1A1AA]'
-                    : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#71717A]'
+            <div
+              className={`inline-flex rounded-lg p-0.5 border ${
+                isDark ? 'bg-[#09090B] border-[#27272A]' : 'bg-[#F4F4F5] border-[#E4E4E7]'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setEditorTab('text')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                  editorTab === 'text'
+                    ? isDark
+                      ? 'bg-[#27272A] text-[#FAFAFA]'
+                      : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
+                    : isDark
+                    ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+                    : 'text-[#71717A] hover:text-[#18181B]'
                 }`}
               >
-                {activeSegments.length}
-              </span>
-            </div>
-
-            {/* Editor View & Weight Mode Toggles */}
-            <div className="flex items-center gap-1.5">
-              <div
-                className={`inline-flex rounded-md p-0.5 border ${
-                  isDark
-                    ? 'bg-[#09090B] border-[#27272A]'
-                    : 'bg-[#F4F4F5] border-[#E4E4E7]'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setEditorTab('bulk')}
-                  className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                    editorTab === 'bulk'
-                      ? isDark
-                        ? 'bg-[#27272A] text-[#FAFAFA]'
-                        : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
-                      : isDark
-                      ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
-                      : 'text-[#71717A] hover:text-[#18181B]'
-                  }`}
-                >
-                  <AlignLeft className="w-3 h-3" />
-                  <span>Text</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditorTab('list')}
-                  className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                    editorTab === 'list'
-                      ? isDark
-                        ? 'bg-[#27272A] text-[#FAFAFA]'
-                        : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
-                      : isDark
-                      ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
-                      : 'text-[#71717A] hover:text-[#18181B]'
-                  }`}
-                >
-                  <List className="w-3 h-3" />
-                  <span>Items</span>
-                </button>
-              </div>
+                <AlignLeft className="w-3.5 h-3.5" />
+                <span>Teks</span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  const next = weightMode === 'equal' ? 'weighted' : 'equal';
-                  setWeightMode(next);
-                  if (next === 'weighted') {
-                    setEditorTab('list');
-                  }
-                }}
-                title="Toggle equal vs weighted probability mode"
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1 ${
-                  weightMode === 'weighted'
-                    ? 'border-[#6366F1] bg-[#6366F1]/10 text-[#6366F1]'
+                onClick={() => setEditorTab('items')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                  editorTab === 'items'
+                    ? isDark
+                      ? 'bg-[#27272A] text-[#FAFAFA]'
+                      : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
                     : isDark
-                    ? 'border-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA]'
-                    : 'border-[#E4E4E7] text-[#71717A] hover:text-[#18181B]'
+                    ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+                    : 'text-[#71717A] hover:text-[#18181B]'
                 }`}
               >
-                <Scale className="w-3.5 h-3.5" />
-                <span>{weightMode === 'weighted' ? 'Weighted' : 'Equal'}</span>
+                <List className="w-3.5 h-3.5" />
+                <span>Item</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorTab('stats')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                  editorTab === 'stats'
+                    ? isDark
+                      ? 'bg-[#27272A] text-[#FAFAFA]'
+                      : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
+                    : isDark
+                    ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+                    : 'text-[#71717A] hover:text-[#18181B]'
+                }`}
+              >
+                <PieChart className="w-3.5 h-3.5" />
+                <span>Peluang</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorTab('history')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                  editorTab === 'history'
+                    ? isDark
+                      ? 'bg-[#27272A] text-[#FAFAFA]'
+                      : 'bg-[#FFFFFF] text-[#18181B] shadow-2xs'
+                    : isDark
+                    ? 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+                    : 'text-[#71717A] hover:text-[#18181B]'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Riwayat ({history.length})</span>
               </button>
             </div>
+
+            {/* Mode Weight Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = weightMode === 'equal' ? 'weighted' : 'equal';
+                setWeightMode(next);
+                if (next === 'weighted') {
+                  setEditorTab('items');
+                }
+              }}
+              title="Toggle mode bobot probabilitas"
+              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-colors flex items-center gap-1 cursor-pointer ${
+                weightMode === 'weighted'
+                  ? 'border-[#6366F1] bg-[#6366F1]/10 text-[#6366F1]'
+                  : isDark
+                  ? 'border-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA]'
+                  : 'border-[#E4E4E7] text-[#71717A] hover:text-[#18181B]'
+              }`}
+            >
+              <Scale className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{weightMode === 'weighted' ? 'Bobot' : 'Sama'}</span>
+            </button>
           </div>
 
-          {/* Action Toolbar: Shuffle, Clear, Import/Export */}
+          {/* Action Toolbar */}
           <div
-            className={`px-4 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs ${
-              isDark
-                ? 'bg-[#18181B]/40 border-[#27272A]'
-                : 'bg-[#FAFAFA] border-[#E4E4E7]'
+            className={`px-4 py-2 border-b flex items-center justify-between gap-2 text-xs ${
+              isDark ? 'bg-[#18181B]/40 border-[#27272A]' : 'bg-[#FAFAFA] border-[#E4E4E7]'
             }`}
           >
             <div className="flex items-center gap-1.5">
@@ -1313,14 +1656,14 @@ export default function App() {
                 type="button"
                 onClick={handleShuffle}
                 disabled={isSpinning || activeSegments.length <= 1}
-                className={`px-2.5 py-1.5 rounded-md font-medium border transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`px-2.5 py-1.5 rounded-md font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   isDark
                     ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#FAFAFA]'
                     : 'border-[#E4E4E7] bg-[#FFFFFF] hover:bg-[#F4F4F5] text-[#18181B]'
                 }`}
               >
                 <Shuffle className="w-3.5 h-3.5" />
-                <span>Shuffle</span>
+                <span>Acak</span>
               </button>
 
               {!confirmingClear ? (
@@ -1328,40 +1671,38 @@ export default function App() {
                   type="button"
                   onClick={() => setConfirmingClear(true)}
                   disabled={isSpinning || entries.length === 0}
-                  className={`px-2.5 py-1.5 rounded-md font-medium border transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`px-2.5 py-1.5 rounded-md font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                     isDark
                       ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#FAFAFA]'
                       : 'border-[#E4E4E7] bg-[#FFFFFF] hover:bg-[#F4F4F5] text-[#18181B]'
                   }`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Clear</span>
+                  <span>Hapus</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={handleClearAll}
-                    className="px-2.5 py-1.5 rounded-md font-medium bg-rose-600 hover:bg-rose-700 text-white transition-colors"
+                    className="px-2.5 py-1.5 rounded-md font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer"
                   >
-                    Confirm Clear
+                    Hapus Semua
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmingClear(false)}
-                    className={`px-2 py-1.5 rounded-md font-medium border ${
-                      isDark
-                        ? 'border-[#27272A] text-[#A1A1AA]'
-                        : 'border-[#E4E4E7] text-[#71717A]'
+                    className={`px-2 py-1.5 rounded-md font-semibold border cursor-pointer ${
+                      isDark ? 'border-[#27272A] text-[#A1A1AA]' : 'border-[#E4E4E7] text-[#71717A]'
                     }`}
                   >
-                    Cancel
+                    Batal
                   </button>
                 </div>
               )}
             </div>
 
-            {/* JSON Import / Export */}
+            {/* Import / Export */}
             <div className="flex items-center gap-1">
               <input
                 ref={fileInputRef}
@@ -1374,8 +1715,8 @@ export default function App() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isSpinning}
-                title="Import JSON configuration"
-                className={`p-1.5 rounded-md border transition-colors disabled:opacity-40 ${
+                title="Impor konfigurasi JSON"
+                className={`p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 ${
                   isDark
                     ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA]'
                     : 'border-[#E4E4E7] bg-[#FFFFFF] hover:bg-[#F4F4F5] text-[#71717A] hover:text-[#18181B]'
@@ -1387,8 +1728,8 @@ export default function App() {
                 type="button"
                 onClick={handleExportJSON}
                 disabled={activeSegments.length === 0}
-                title="Export JSON configuration"
-                className={`p-1.5 rounded-md border transition-colors disabled:opacity-40 ${
+                title="Ekspor konfigurasi JSON"
+                className={`p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 ${
                   isDark
                     ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA]'
                     : 'border-[#E4E4E7] bg-[#FFFFFF] hover:bg-[#F4F4F5] text-[#71717A] hover:text-[#18181B]'
@@ -1400,287 +1741,243 @@ export default function App() {
           </div>
 
           {/* Editor Body */}
-          <div className="p-4 flex-1 flex flex-col">
-            {editorTab === 'bulk' ? (
+          <div className="p-4 flex-1 flex flex-col min-h-[360px] max-h-[520px]">
+            {editorTab === 'text' && (
               <div className="flex flex-col flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <label
-                    htmlFor="entries-textarea"
-                    className={`text-xs ${
-                      isDark ? 'text-[#A1A1AA]' : 'text-[#71717A]'
-                    }`}
-                  >
-                    One question or entry per line
-                  </label>
-                  {entries.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={handleLoadSamplePreset}
-                      className="text-xs text-[#6366F1] hover:underline font-medium"
-                    >
-                      Restore sample questions
-                    </button>
-                  )}
+                <div className="flex items-center justify-between mb-2 text-xs">
+                  <span className={isDark ? 'text-[#A1A1AA]' : 'text-[#71717A]'}>
+                    Satu pertanyaan / entri per baris
+                  </span>
+                  <span className="font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500">
+                    Total: {entries.length}
+                  </span>
                 </div>
                 <textarea
                   id="entries-textarea"
                   value={bulkTextValue}
                   onChange={handleBulkTextChange}
                   disabled={isSpinning}
-                  placeholder="Enter questions or names, one per line..."
-                  rows={12}
-                  className={`w-full flex-1 min-h-[280px] max-h-[380px] rounded-md border p-3 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-colors ${
+                  placeholder="Ketik entri di sini (1 per baris)..."
+                  className={`w-full flex-1 p-3 text-sm rounded-lg border font-mono resize-none focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-colors ${
                     isDark
-                      ? 'bg-[#09090B] border-[#27272A] text-[#FAFAFA] placeholder-[#52525B]'
-                      : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#18181B] placeholder-[#A1A1AA]'
+                      ? 'bg-[#09090B] border-[#27272A] text-[#FAFAFA]'
+                      : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#18181B]'
                   }`}
                 />
               </div>
-            ) : (
-              <div className="flex flex-col flex-1">
-                {/* Add Individual Entry Form */}
-                <form onSubmit={handleAddSingleEntry} className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={newItemLabel}
-                    onChange={(e) => setNewItemLabel(e.target.value)}
-                    disabled={isSpinning}
-                    placeholder="Add a long question or entry..."
-                    className={`flex-1 min-w-0 rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6366F1] ${
-                      isDark
-                        ? 'bg-[#09090B] border-[#27272A] text-[#FAFAFA] placeholder-[#52525B]'
-                        : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#18181B] placeholder-[#A1A1AA]'
-                    }`}
-                  />
-                  {weightMode === 'weighted' && (
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={newItemWeight}
-                      onChange={(e) => setNewItemWeight(Number(e.target.value) || 1)}
-                      disabled={isSpinning}
-                      aria-label="Entry weight"
-                      title="Weight multiplier"
-                      className={`w-16 rounded-md border px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#6366F1] ${
-                        isDark
-                          ? 'bg-[#09090B] border-[#27272A] text-[#FAFAFA]'
-                          : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#18181B]'
+            )}
+
+            {editorTab === 'items' && (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {entries.map((entry, idx) => (
+                    <div
+                      key={entry.id}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-2 text-xs transition-colors ${
+                        isDark ? 'bg-[#18181B] border-[#27272A]' : 'bg-[#FAFAFA] border-[#E4E4E7]'
                       }`}
-                    />
-                  )}
-                  <button
-                    type="submit"
-                    disabled={isSpinning || !newItemLabel.trim()}
-                    className="px-3 py-1.5 rounded-md bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1 shrink-0 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add</span>
-                  </button>
-                </form>
-
-                {/* Individual Entries Scrollable List */}
-                <div
-                  className={`flex-1 min-h-[250px] max-h-[340px] overflow-y-auto rounded-md border divide-y ${
-                    isDark
-                      ? 'bg-[#09090B] border-[#27272A] divide-[#27272A]'
-                      : 'bg-[#FAFAFA] border-[#E4E4E7] divide-[#E4E4E7]'
-                  }`}
-                >
-                  {entries.length === 0 ? (
-                    <div className="h-56 flex flex-col items-center justify-center text-center p-4">
-                      <p
-                        className={`text-xs mb-2 ${
-                          isDark ? 'text-[#71717A]' : 'text-[#A1A1AA]'
+                    >
+                      <span className="font-mono text-gray-400 w-5 text-right shrink-0">
+                        {idx + 1}.
+                      </span>
+                      <input
+                        type="text"
+                        value={entry.label}
+                        onChange={(e) => handleUpdateEntryLabel(entry.id, e.target.value)}
+                        className={`flex-1 px-2 py-1 rounded border text-xs focus:outline-none focus:ring-1 focus:ring-[#6366F1] ${
+                          isDark
+                            ? 'bg-[#09090B] border-[#27272A] text-white'
+                            : 'bg-white border-[#E4E4E7] text-black'
                         }`}
-                      >
-                        No entries yet.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleLoadSamplePreset}
-                        className="text-xs text-[#6366F1] hover:underline font-medium"
-                      >
-                        Load sample entries
-                      </button>
-                    </div>
-                  ) : (
-                    entries.map((item, idx) => {
-                      const colorDot = WHEEL_PALETTE[idx % WHEEL_PALETTE.length].bg;
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-start gap-2 px-2.5 py-2 text-sm"
-                        >
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5"
-                            style={{ backgroundColor: colorDot }}
-                          />
-                          <textarea
-                            rows={Math.min(4, Math.max(1, Math.ceil(item.label.length / 42)))}
-                            value={item.label}
-                            onChange={(e) =>
-                              handleUpdateEntryLabel(item.id, e.target.value.replace(/\r?\n/g, ' '))
-                            }
-                            disabled={isSpinning}
-                            aria-label={`Edit entry ${idx + 1}`}
-                            className="flex-1 min-w-0 bg-transparent focus:outline-none text-sm leading-snug resize-none break-words"
-                          />
+                      />
 
-                          {weightMode === 'weighted' && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateEntryWeight(item.id, -1)}
-                                disabled={isSpinning || item.weight <= 1}
-                                aria-label="Decrease weight"
-                                className={`p-1 rounded border disabled:opacity-30 ${
-                                  isDark
-                                    ? 'border-[#27272A] hover:bg-[#27272A]'
-                                    : 'border-[#E4E4E7] hover:bg-[#E4E4E7]/60'
-                                }`}
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="w-7 text-center text-xs font-mono">
-                                {item.weight}×
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateEntryWeight(item.id, 1)}
-                                disabled={isSpinning || item.weight >= 99}
-                                aria-label="Increase weight"
-                                className={`p-1 rounded border disabled:opacity-30 ${
-                                  isDark
-                                    ? 'border-[#27272A] hover:bg-[#27272A]'
-                                    : 'border-[#E4E4E7] hover:bg-[#E4E4E7]/60'
-                                }`}
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-                          )}
-
+                      {weightMode === 'weighted' && (
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
-                            onClick={() => handleDeleteSingleEntry(item.id)}
-                            disabled={isSpinning}
-                            aria-label={`Remove ${item.label}`}
-                            className={`p-1 rounded transition-colors ${
-                              isDark
-                                ? 'text-[#71717A] hover:text-rose-400 hover:bg-[#27272A]'
-                                : 'text-[#A1A1AA] hover:text-rose-600 hover:bg-[#E4E4E7]/50'
-                            }`}
+                            onClick={() => handleUpdateEntryWeight(entry.id, -1)}
+                            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="font-semibold min-w-[20px] text-center font-mono">
+                            {entry.weight}×
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateEntryWeight(entry.id, 1)}
+                            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
                           </button>
                         </div>
-                      );
-                    })
-                  )}
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSingleEntry(entry.id)}
+                        className="text-gray-400 hover:text-rose-500 p-1 rounded cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Status Toast Indicator */}
-            {statusMessage && (
-              <div
-                role="status"
-                className={`mt-3 px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 border ${
-                  isDark
-                    ? 'bg-[#18181B] border-[#27272A] text-[#FAFAFA]'
-                    : 'bg-[#FAFAFA] border-[#E4E4E7] text-[#18181B]'
-                }`}
-              >
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>{statusMessage}</span>
+            {editorTab === 'stats' && (
+              <div className="flex flex-col flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 mb-2">
+                  <span className="font-semibold text-indigo-500 block mb-1">
+                    📊 Kalkulator Peluang Kemenangan
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Persentase peluang dihitung secara pasti berdasarkan bobot masing-masing entri.
+                  </span>
+                </div>
+
+                {activeSegments.map((seg) => {
+                  const prob = ((weightMode === 'weighted' ? seg.entry.weight : 1) / totalWeight) * 100;
+                  return (
+                    <div
+                      key={seg.entry.id}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 ${
+                        isDark ? 'bg-[#18181B] border-[#27272A]' : 'bg-[#FAFAFA] border-[#E4E4E7]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{ backgroundColor: seg.color.bg }}
+                        />
+                        <span className="font-medium truncate">{seg.entry.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 font-mono font-bold">
+                        <span>{prob.toFixed(1)}%</span>
+                        <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{ width: `${prob}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Prominent Spin Action Button */}
-            <div className="mt-4 pt-3 border-t border-inherit">
-              <button
-                type="button"
-                onClick={spinWheel}
-                disabled={isSpinning || activeSegments.length === 0}
-                className="w-full py-2.5 px-4 rounded-md bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-              >
-                <RotateCw className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
-                <span>{isSpinning ? 'Spinning...' : 'Spin Wheel'}</span>
-              </button>
-            </div>
+            {editorTab === 'history' && (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                {history.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-gray-400 text-xs">
+                    <Trophy className="w-8 h-8 mb-2 opacity-50 text-amber-500" />
+                    <span>Belum ada riwayat pemenang. Putar roda untuk memulai!</span>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                    {history.map((rec) => (
+                      <div
+                        key={rec.id}
+                        className={`p-3 rounded-lg border flex items-center justify-between gap-2 ${
+                          isDark ? 'bg-[#18181B] border-[#27272A]' : 'bg-[#FAFAFA] border-[#E4E4E7]'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate text-sm">{rec.entry.label}</div>
+                          <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                            {new Date(rec.timestamp).toLocaleTimeString()}
+                            {rec.roundNumber && ` • Round ${rec.roundNumber}`}
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 shrink-0">
+                          MENANG
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
       </main>
 
       {/* ==========================================
-          POP-UP MODAL: THE QUESTION IS
+          WINNER POPUP MODAL (GACOR CELEBRATION)
       ========================================== */}
       {showWinnerModal && winner && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="winner-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-[2px]"
-          onClick={() => setShowWinnerModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
         >
           <div
-            onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-lg rounded-xl border p-6 sm:p-7 shadow-xl transition-all ${
-              isDark
-                ? 'bg-[#121215] border-[#27272A] text-[#FAFAFA]'
-                : 'bg-[#FFFFFF] border-[#E4E4E7] text-[#18181B]'
+            className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all scale-100 ${
+              isDark ? 'bg-[#121215] border-[#27272A] text-white' : 'bg-white border-[#E4E4E7] text-black'
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-inherit">
-              <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-[#6366F1]">
-                <Sparkles className="w-4 h-4 shrink-0" />
-                <span id="winner-modal-title">THE QUESTION IS :</span>
+            {/* Top Bar */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold tracking-wider uppercase text-indigo-500">
+                <Sparkles className="w-4 h-4" />
+                <span>
+                  {eliminationMode ? `ROUND ${roundNumber - 1} CHAMPION` : 'SELAMAT KEPADA PEMENANG!'}
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowWinnerModal(false)}
-                aria-label="Close question pop-up"
-                className={`p-1 rounded-md transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-[#27272A] text-[#A1A1AA]' : 'hover:bg-[#F4F4F5] text-[#71717A]'
-                }`}
+                className="text-gray-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Winner Card Display */}
             <div
-              className={`my-6 p-4 sm:p-5 rounded-lg border max-h-[55vh] overflow-y-auto ${
-                isDark
-                  ? 'bg-[#18181B]/70 border-[#27272A]'
-                  : 'bg-[#FAFAFA] border-[#E4E4E7]'
+              className={`p-6 rounded-xl border text-center mb-6 relative overflow-hidden ${
+                isDark ? 'bg-[#18181B] border-[#27272A]' : 'bg-[#FAFAFA] border-[#E4E4E7]'
               }`}
             >
-              <p className="text-lg sm:text-xl font-medium leading-relaxed break-words whitespace-pre-wrap">
+              <div className="inline-flex p-3 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-white mb-3 shadow-md">
+                <Trophy className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black leading-tight break-words tracking-tight">
                 {winner.entry.label}
-              </p>
+              </h2>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyWinner}
+                className={`w-full sm:w-auto px-4 py-2.5 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                  isDark ? 'border-[#27272A] hover:bg-[#18181B]' : 'border-[#E4E4E7] hover:bg-gray-100'
+                }`}
+              >
+                {copiedToast ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedToast ? 'Tersalin!' : 'Salin Teks'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleRemoveWinner}
-                className={`px-4 py-2.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  isDark
-                    ? 'border-[#27272A] bg-[#18181B] hover:bg-[#27272A] text-[#FAFAFA]'
-                    : 'border-[#E4E4E7] bg-[#FFFFFF] hover:bg-[#F4F4F5] text-[#18181B]'
-                }`}
+                className="w-full sm:flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <UserMinus className="w-3.5 h-3.5" />
-                <span>Remove Question</span>
+                <span>Hapus Pertanyaan</span>
               </button>
+
               <button
                 type="button"
                 onClick={handleSpinAgain}
-                className="px-4 py-2.5 rounded-md text-xs font-medium bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="w-full sm:flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <RotateCw className="w-3.5 h-3.5" />
-                <span>Spin Again</span>
+                <span>Putar Lagi</span>
               </button>
             </div>
           </div>
@@ -1688,116 +1985,178 @@ export default function App() {
       )}
 
       {/* ==========================================
-          MODALS: ABOUT & HELP
+          SETTINGS MODAL
       ========================================== */}
-      {activeModal && (
+      {activeModal === 'settings' && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[1px]"
-          onClick={() => setActiveModal(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         >
           <div
-            onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md rounded-lg border p-5 shadow-lg ${
-              isDark
-                ? 'bg-[#121215] border-[#27272A] text-[#FAFAFA]'
-                : 'bg-[#FFFFFF] border-[#E4E4E7] text-[#18181B]'
+            className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl ${
+              isDark ? 'bg-[#121215] border-[#27272A] text-white' : 'bg-white border-[#E4E4E7] text-black'
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-inherit">
-              <h2 id="modal-title" className="font-medium text-base">
-                {activeModal === 'about' ? 'About Wheel' : 'How to Use Wheel'}
-              </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Settings className="w-4 h-4 text-indigo-500" />
+                <span>Pengaturan Tema & Suara</span>
+              </h3>
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                aria-label="Close modal"
-                className={`p-1 rounded-md ${
-                  isDark ? 'hover:bg-[#27272A]' : 'hover:bg-[#F4F4F5]'
-                }`}
+                className="text-gray-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {activeModal === 'about' ? (
-              <div
-                className={`mt-4 space-y-3 text-xs leading-relaxed ${
-                  isDark ? 'text-[#A1A1AA]' : 'text-[#71717A]'
-                }`}
-              >
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    Wheel
-                  </strong>{' '}
-                  is a minimalist, high-precision random name picker built for speed,
-                  clarity, and unbiased selection.
-                </p>
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    True Random Selection:
-                  </strong>{' '}
-                  Every spin selects its winner using hardware-seeded system entropy for
-                  genuinely fair and unpredictable results on every turn.
-                </p>
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    Synchronized Physics:
-                  </strong>{' '}
-                  The HTML5 Canvas wheel calculates exact angular geometry for 1 to 100+
-                  entries and smoothly decelerates so the physical pointer lands directly
-                  on the selected entry.
-                </p>
+            <div className="space-y-5 text-xs">
+              {/* Palette Choice */}
+              <div>
+                <label className="font-semibold block mb-2 text-gray-400 uppercase tracking-wider text-[10px]">
+                  Palet Warna Roda
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {WHEEL_PALETTES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPaletteId(p.id)}
+                      className={`p-2.5 rounded-lg border text-left flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                        selectedPaletteId === p.id
+                          ? 'border-[#6366F1] bg-[#6366F1]/10 font-bold'
+                          : isDark
+                          ? 'border-[#27272A] bg-[#18181B]'
+                          : 'border-[#E4E4E7] bg-gray-50'
+                      }`}
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <div className="flex items-center -space-x-1 shrink-0">
+                        {p.colors.slice(0, 4).map((c, i) => (
+                          <span
+                            key={i}
+                            className="w-3.5 h-3.5 rounded-full border border-black/20"
+                            style={{ backgroundColor: c.bg }}
+                          />
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div
-                className={`mt-4 space-y-2.5 text-xs leading-relaxed ${
-                  isDark ? 'text-[#A1A1AA]' : 'text-[#71717A]'
-                }`}
-              >
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    1. Enter Names:
-                  </strong>{' '}
-                  Use the <em>Text</em> tab to paste or type one entry per line, or switch
-                  to <em>Items</em> to add, edit, or delete individual entries.
-                </p>
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    2. Spin the Wheel:
-                  </strong>{' '}
-                  Click the center <strong>SPIN</strong> button, click anywhere on the
-                  wheel, or press <code className="font-mono">Ctrl/⌘ + Enter</code>.
-                </p>
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    3. Weighted Mode:
-                  </strong>{' '}
-                  Toggle <em>Equal / Weighted</em> at the top of the Entries panel to
-                  assign custom probability multipliers to individual entries.
-                </p>
-                <p>
-                  <strong className={isDark ? 'text-[#FAFAFA]' : 'text-[#18181B]'}>
-                    4. Import &amp; Export:
-                  </strong>{' '}
-                  Use the upload and download icons in the toolbar to save or restore wheel
-                  configurations as portable JSON files.
-                </p>
-              </div>
-            )}
 
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-colors"
-              >
-                Done
-              </button>
+              {/* Spin Duration & Pointer Style */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="font-semibold block mb-1 text-gray-400 uppercase tracking-wider text-[10px]">
+                    Durasi Putaran ({spinDurationSec} detik)
+                  </label>
+                  <input
+                    type="range"
+                    min="2"
+                    max="12"
+                    value={spinDurationSec}
+                    onChange={(e) => setSpinDurationSec(Number(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1 text-gray-400 uppercase tracking-wider text-[10px]">
+                    Gaya Jarum Penunjuk
+                  </label>
+                  <select
+                    value={pointerStyle}
+                    onChange={(e) => setPointerStyle(e.target.value as PointerStyle)}
+                    className={`w-full p-2 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                      isDark ? 'bg-[#18181B] border-[#27272A] text-white' : 'bg-white border-[#E4E4E7]'
+                    }`}
+                  >
+                    <option value="classic">Segitiga Klasik</option>
+                    <option value="crown">Mahkota Raja 👑</option>
+                    <option value="flame">Api Api 🔥</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Sound Settings */}
+              <div className="p-3 rounded-lg border bg-indigo-500/5 border-indigo-500/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-500">Audio & Efek Suara</span>
+                  <button
+                    type="button"
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className="text-xs text-indigo-500 font-bold hover:underline cursor-pointer"
+                  >
+                    {soundEnabled ? 'Matikan' : 'Nyalakan'}
+                  </button>
+                </div>
+
+                {soundEnabled && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <Volume1 className="w-4 h-4 text-gray-400 shrink-0" />
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={(e) => setSoundVolume(Number(e.target.value))}
+                        className="w-full accent-indigo-500 cursor-pointer"
+                      />
+                      <span className="font-mono text-gray-400 shrink-0 min-w-[32px]">
+                        {Math.round(soundVolume * 100)}%
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold block mb-1 text-gray-400 uppercase tracking-wider text-[10px]">
+                        Profil Suara Putaran
+                      </label>
+                      <select
+                        value={soundProfile}
+                        onChange={(e) => setSoundProfile(e.target.value as WheelSoundProfile)}
+                        className={`w-full p-2 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                          isDark ? 'bg-[#18181B] border-[#27272A] text-white' : 'bg-white border-[#E4E4E7]'
+                        }`}
+                      >
+                        <option value="classic">Klasik Kayu / Peg</option>
+                        <option value="arcade">Arcade 8-Bit</option>
+                        <option value="casino">Casino Slot</option>
+                        <option value="wooden">Ketukan Kayu Dalam</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Mode Eliminasi / Battle Royale */}
+              <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold text-amber-500 block">Mode Eliminasi (Survivor)</span>
+                  <span className="text-gray-400 text-[11px]">
+                    Setiap pemenang otomatis ditandai dan dicatat per round.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={eliminationMode}
+                  onChange={(e) => setEliminationMode(e.target.checked)}
+                  className="w-4 h-4 accent-amber-500 cursor-pointer"
+                />
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {statusMessage && (
+        <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-xs font-semibold shadow-xl border border-gray-800 animate-bounce">
+          {statusMessage}
         </div>
       )}
     </div>
