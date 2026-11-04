@@ -1905,6 +1905,65 @@ export default function App() {
       </main>
 
       {/* ==========================================
+          HELP MODAL
+      ========================================== */}
+      {activeModal === 'help' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        >
+          <div
+            className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl ${
+              isDark ? 'bg-[#121215] border-[#27272A] text-white' : 'bg-white border-[#E4E4E7] text-black'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-indigo-500" />
+                <span>Bantuan & Panduan</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-xs">
+              <div>
+                <h4 className="font-bold text-indigo-500 mb-1">Shortcut Keyboard</h4>
+                <ul className="list-disc pl-4 space-y-1 text-gray-500 dark:text-gray-400">
+                  <li><kbd className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">Space</kbd> / <kbd className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">Ctrl+Enter</kbd> : Putar roda</li>
+                  <li><kbd className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">F</kbd> : Toggle Fullscreen</li>
+                  <li><kbd className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">Esc</kbd> : Tutup pop-up</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-bold text-indigo-500 mb-1">Mode Bobot (Weighted)</h4>
+                <p className="text-gray-500 dark:text-gray-400">
+                  Secara default, semua entri memiliki peluang yang sama. Saat Anda mengaktifkan <strong>Mode Bobot</strong> di tab Item, Anda dapat memberikan porsi (weight) lebih besar untuk item tertentu agar peluangnya lebih tinggi untuk menang.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-bold text-indigo-500 mb-1">Mode Eliminasi</h4>
+                <p className="text-gray-500 dark:text-gray-400">
+                  Aktifkan di Pengaturan. Saat aktif, pemenang dihitung per ronde. Sangat cocok untuk sistem gugur atau pembagian hadiah berurutan.
+                </p>
+              </div>
+              <div className="pt-2">
+                <p className="text-center font-mono text-[10px] text-gray-400 opacity-60">
+                  Wheel of Questions — GACOR PRO Edition
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
           WINNER POPUP MODAL (GACOR CELEBRATION)
       ========================================== */}
       {showWinnerModal && winner && (
